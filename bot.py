@@ -7,9 +7,9 @@ import json
 import random
 
 
-connection = pymysql.connect(host='localhost',
-                             user='chiz',
-                             password='1231',
+connection = pymysql.connect(host='25.9.32.207',
+                             user='username',
+                             password='password',
                              database='riba',
                              cursorclass=pymysql.cursors.DictCursor)
 
@@ -34,6 +34,7 @@ def getFish(tier):
     for fish in fishList:
         cumulative_probability += fish['rate']
         if rand <= cumulative_probability:
+            fish['weight'] = random.uniform(tier * 1.0, tier * 3.0)
             return fish
 
 def getFishCollection():
@@ -44,6 +45,12 @@ def getFishCollection():
         global fishCollection
         fishCollection = collection
 
+def logFishCatch(user_id, fishi_id, weight):
+    with connection.cursor() as cursor:
+        insertSQL = "INSERT INTO fishing_log (user_id, fishi_id, weight) VALUES (%s, %s, %s)"
+        cursor.execute(insertSQL, (user_id, fishi_id, weight))
+        connection.commit()
+
 @bot.callback_query_handler(func=lambda call: True)
 def handle_query(call):
 
@@ -53,7 +60,11 @@ def handle_query(call):
         if (check_message_exists(call.message.chat.id, call.message.id)):
             if (data['success']):
                 the_fish = [fish for fish in fishCollection if fish['id'] == data['the_fish_id']][0]
-                bot.send_message(call.message.chat.id, f'вы поймиали {the_fish['name']}')
+                weight = the_fish['weight']
+                user_id = call.from_user.id
+                fish_id = the_fish['id']
+                logFishCatch(user_id, fish_id, weight)
+                bot.send_message(call.message.chat.id, f'вы поймали {the_fish["name"]} весом {weight} кг')
             else:
                 bot.send_message(call.message.chat.id, 'рыба сорвалась!!')
 
@@ -61,8 +72,7 @@ def handleCastingALine(msg):
 
     fishBtn = random.randint(1, 25)
 
-    #fetching the user's rod to determine which tier to generate fish from def 1
-    fish = getFish(1) #tier 1
+    fish = getFish(1) # tier 1
     markup = InlineKeyboardMarkup()
 
     for i in range(5): 
