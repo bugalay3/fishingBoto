@@ -1,0 +1,70 @@
+import telebot
+import pymysql.cursors
+import asyncio
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import json
+import random
+
+
+connection = pymysql.connect(host='localhost',
+                             user='chiz',
+                             password='1231',
+                             database='riba',
+                             cursorclass=pymysql.cursors.DictCursor)
+
+bot = telebot.TeleBot("8073637300:AAEpVRPS5-Zfn4Ku7YYgJ5qwVu-kQgbUAEY", parse_mode=None)
+
+@bot.callback_query_handler(func=lambda call: True)
+def handle_query(call):
+    data = json.loads(call.data)
+    if (data['data_from'] == 'casting_a_line'):
+        if (data['btn_clicked'] == data['btn_fish']):
+            bot.send_message(call.message.chat.id, 'u got')
+
+def handleCastingALine(msg, fishBtn):
+    markup = InlineKeyboardMarkup()
+
+    for i in range(5): 
+        row_buttons = []
+        for j in range(1, 6): 
+            button_number = i * 5 + j
+            if (button_number == fishBtn):
+                button = InlineKeyboardButton(text='🐟', callback_data=json.dumps({'data_from:': 'casting_a_line', 'user_id': msg.from_user.id, 'btn_clicked': button_number, 'btn_fish': fishBtn}))
+            else:
+                button = InlineKeyboardButton(text='🟦', callback_data=json.dumps({'data_from:': 'casting_a_line', 'user_id': msg.from_user.id, 'btn_clicked': button_number, 'btn_fish': fishBtn}))
+
+            row_buttons.append(button)
+        markup.add(*row_buttons)
+
+    bot.send_message(msg.chat.id, "Выберите кнопку:", reply_markup=markup)
+
+def handleStart(msg):
+    with connection.cursor() as cursor:
+        checkIfExistsSQL = ("select username, user_id from users where user_id = '%s';")
+        cursor.execute(checkIfExistsSQL, msg.from_user.id)
+        user = cursor.fetchone()
+        
+        if (user):
+
+            bot.send_message(msg.chat.id, 'привет, ' + user['username'])
+        else:
+
+            addUserSQL = "INSERT INTO users (user_id, username, fishing_rod) VALUES (%s, %s, %s)"
+            cursor.execute(addUserSQL, (msg.from_user.id, msg.from_user.username, str(msg.from_user.id) + "s_rod"))
+            connection.commit()
+            bot.send_message(msg.chat.id, 'привет, ' + msg.from_user.username + ' тебя добавили в бата')
+
+with connection:
+    @bot.message_handler(func=lambda message: True)
+    def send_welcome(msg):
+
+        if (msg.text == '/start'):
+            handleStart(msg)
+        if (msg.text == '/cast_a_line'):
+            fishBtn = random.randint(1, 25)
+            handleCastingALine(msg, fishBtn)
+
+
+
+    bot.infinity_polling()

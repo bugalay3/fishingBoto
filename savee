@@ -1,0 +1,17 @@
+async def handle_query(call):
+    user_id = call.from_user.id
+
+    if user_id not in user_locks:
+        user_locks[user_id] = asyncio.Lock()
+
+    async with user_locks[user_id]:
+        data = json.loads(call.data)
+
+        if data['event_id'] == 1:
+            if data['success']:
+                the_fish = [fish for fish in fishCollection if fish['id'] == data['the_fish_id']][0]
+                await bot.send_message(call.message.chat.id, f'Вы поймали {the_fish["name"]}')
+            else:
+                await bot.send_message(call.message.chat.id, 'Рыба сорвалась!!')
+
+            await bot.delete_message(call.message.chat.id, call.message.id)
